@@ -154,6 +154,7 @@ if st.button("🚀 Screener starten"):
                     abs(dist_52w) * w_dist +
                     (div * 100) * w_div +
                     (max_pe - pe) * w_pe
+                )
 results.append({
     "Ticker": ticker,
     "Name": name,
