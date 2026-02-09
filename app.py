@@ -11,27 +11,86 @@ st.set_page_config(page_title="Aktienscreener", layout="wide")
 st.title("📈 Aktienscreener – Value, Momentum & Turnaround")
 
 # --------------------------------------------------
-# Sidebar – Modus
+# SIDEBAR – FORM (alles wird erst beim Start gesetzt!)
 # --------------------------------------------------
-st.sidebar.header("👤 Modus")
+with st.sidebar.form("screener_form"):
 
-mode = st.sidebar.radio(
-    "Benutzermodus",
-    ["🟢 Anfänger", "🔵 Pro"],
-    help="Anfänger = einfache Presets | Pro = volle Kontrolle"
-)
+    st.header("👤 Modus")
+    mode = st.radio(
+        "Benutzermodus",
+        ["🟢 Anfänger", "🔵 Pro"]
+    )
+
+    st.divider()
+
+    st.header("🌍 Indizes")
+    indices = st.multiselect(
+        "Welche Märkte?",
+        ["DAX", "Dow Jones", "S&P 500", "Nikkei"],
+        default=["DAX", "Dow Jones"]
+    )
+
+    st.divider()
+
+    if mode == "🟢 Anfänger":
+        st.header("🧭 Strategie")
+        strategy = st.selectbox(
+            "Anlagestrategie",
+            ["⚖️ Ausgewogen", "🚀 Wachstum", "🛡️ Dividende", "🎯 Turnaround"]
+        )
+    else:
+        st.header("🔍 Filter")
+        min_perf = st.slider("3W Performance (%)", -10, 20, 2)
+        min_div = st.slider("Dividende (%)", 0.0, 10.0, 1.5)
+        max_pe = st.slider("Max. KGV", 5, 40, 18)
+        min_dist = st.slider("Abstand vom 52W-Hoch (%)", 0, 60, 15)
+
+        use_div = st.checkbox("Dividenden-Filter aktiv", True)
+        use_dist = st.checkbox("52W-Abstand aktiv", True)
+
+        st.subheader("⚖️ Score-Gewichtung")
+        w_perf = st.slider("Momentum", 0.0, 1.0, 0.4)
+        w_dist = st.slider("Turnaround", 0.0, 1.0, 0.2)
+        w_div = st.slider("Dividende", 0.0, 1.0, 0.2)
+        w_pe = st.slider("Bewertung (KGV)", 0.0, 1.0, 0.2)
+
+    submitted = st.form_submit_button("🚀 Screener starten")
 
 # --------------------------------------------------
-# Sidebar – Indizes
+# Warten bis Start gedrückt wurde
 # --------------------------------------------------
-st.sidebar.header("🌍 Indizes")
+if not submitted:
+    st.info("⬅️ Bitte Parameter einstellen und den Screener starten.")
+    st.stop()
 
-indices = st.sidebar.multiselect(
-    "Welche Märkte?",
-    ["DAX", "Dow Jones", "S&P 500", "Nikkei"],
-    default=["DAX", "Dow Jones"]
-)
+# --------------------------------------------------
+# Presets für Anfänger-Modus (NACH dem Button!)
+# --------------------------------------------------
+if mode == "🟢 Anfänger":
 
+    if strategy == "⚖️ Ausgewogen":
+        min_perf, min_div, max_pe, min_dist = 0, 1.5, 18, 15
+        w_perf, w_dist, w_div, w_pe = 0.4, 0.2, 0.2, 0.2
+        use_div, use_dist = True, True
+
+    elif strategy == "🚀 Wachstum":
+        min_perf, min_div, max_pe, min_dist = 5, 0.0, 30, 5
+        w_perf, w_dist, w_div, w_pe = 0.7, 0.1, 0.0, 0.2
+        use_div, use_dist = False, False
+
+    elif strategy == "🛡️ Dividende":
+        min_perf, min_div, max_pe, min_dist = -2, 3.0, 15, 20
+        w_perf, w_dist, w_div, w_pe = 0.2, 0.1, 0.5, 0.2
+        use_div, use_dist = True, True
+
+    elif strategy == "🎯 Turnaround":
+        min_perf, min_div, max_pe, min_dist = -5, 0.5, 20, 35
+        w_perf, w_dist, w_div, w_pe = 0.2, 0.6, 0.1, 0.1
+        use_div, use_dist = False, True
+
+# --------------------------------------------------
+# Ticker Map
+# --------------------------------------------------
 ticker_map = {}
 if "DAX" in indices:
     ticker_map.update(DAX)
@@ -43,131 +102,80 @@ if "Nikkei" in indices:
     ticker_map.update(NIKKEI)
 
 # --------------------------------------------------
-# Anfänger-Modus
-# --------------------------------------------------
-if mode == "🟢 Anfänger":
-
-    st.sidebar.header("🧭 Strategie")
-
-    strategy = st.sidebar.selectbox(
-        "Anlagestrategie",
-        ["⚖️ Ausgewogen", "🚀 Wachstum", "🛡️ Dividende", "🎯 Turnaround"]
-    )
-
-    if strategy == "⚖️ Ausgewogen":
-        min_perf, min_div, max_pe, min_dist = 0, 1.5, 18, 15
-        w_perf, w_dist, w_div, w_pe = 0.4, 0.2, 0.2, 0.2
-
-    elif strategy == "🚀 Wachstum":
-        min_perf, min_div, max_pe, min_dist = 5, 0.0, 30, 5
-        w_perf, w_dist, w_div, w_pe = 0.7, 0.1, 0.0, 0.2
-
-    elif strategy == "🛡️ Dividende":
-        min_perf, min_div, max_pe, min_dist = -2, 3.0, 15, 20
-        w_perf, w_dist, w_div, w_pe = 0.2, 0.1, 0.5, 0.2
-
-    elif strategy == "🎯 Turnaround":
-        min_perf, min_div, max_pe, min_dist = -5, 0.5, 20, 35
-        w_perf, w_dist, w_div, w_pe = 0.2, 0.6, 0.1, 0.1
-
-    use_div = True
-    use_dist = True
-
-# --------------------------------------------------
-# Pro-Modus
-# --------------------------------------------------
-else:
-    st.sidebar.header("🔍 Filter")
-
-    min_perf = st.sidebar.slider("3W Performance (%)", -10, 20, 2)
-    min_div = st.sidebar.slider("Dividende (%)", 0.0, 10.0, 1.5)
-    max_pe = st.sidebar.slider("Max. KGV", 5, 40, 18)
-    min_dist = st.sidebar.slider("Abstand vom 52W-Hoch (%)", 0, 60, 15)
-
-    use_div = st.sidebar.checkbox("Dividenden-Filter aktiv", True)
-    use_dist = st.sidebar.checkbox("52W-Abstand aktiv", True)
-
-    st.sidebar.header("⚖️ Score-Gewichtung")
-    w_perf = st.sidebar.slider("Momentum", 0.0, 1.0, 0.4)
-    w_dist = st.sidebar.slider("Turnaround", 0.0, 1.0, 0.2)
-    w_div = st.sidebar.slider("Dividende", 0.0, 1.0, 0.2)
-    w_pe = st.sidebar.slider("Bewertung (KGV)", 0.0, 1.0, 0.2)
-
-# --------------------------------------------------
 # Zeitraum
 # --------------------------------------------------
 end = datetime.today()
 start = end - timedelta(days=120)
 
 # --------------------------------------------------
-# Screener
+# Screener Logik
 # --------------------------------------------------
-if st.button("🚀 Screener starten"):
+results = []
 
-    results = []
+with st.spinner("📡 Lade Marktdaten..."):
+    for ticker, name in ticker_map.items():
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(start=start, end=end)
 
-    total = after_perf = after_dist = after_pe = after_div = 0
+            if len(hist) < 30:
+                continue
 
-    with st.spinner("📡 Lade Marktdaten..."):
-        for ticker, name in ticker_map.items():
-            try:
-                total += 1
+            price_now = hist["Close"].iloc[-1]
+            price_3w = hist["Close"].iloc[-15]
 
-                stock = yf.Ticker(ticker)
-                hist = stock.history(start=start, end=end)
+            perf_3w = ((price_now / price_3w) - 1) * 100
+            high_52w = hist["High"].max()
+            dist_52w = ((price_now / high_52w) - 1) * 100
 
-                if len(hist) < 30:
-                    continue
+            info = stock.info
+            pe = info.get("trailingPE")
+            div = info.get("dividendYield")
 
-                price_now = hist["Close"].iloc[-1]
-                price_3w = hist["Close"].iloc[-15]
+            if pe is None:
+                continue
+            if use_div and (div is None or div * 100 < min_div):
+                continue
+            if perf_3w < min_perf:
+                continue
+            if use_dist and dist_52w > -min_dist:
+                continue
+            if pe > max_pe:
+                continue
 
-                perf_3w = ((price_now / price_3w) - 1) * 100
-                high_52w = hist["High"].max()
-                dist_52w = ((price_now / high_52w) - 1) * 100
+            score = (
+                perf_3w * w_perf +
+                abs(dist_52w) * w_dist +
+                (div * 100 if div else 0) * w_div +
+                (max_pe - pe) * w_pe
+            )
 
-                info = stock.info
-                pe = info.get("trailingPE")
-                div = info.get("dividendYield")
+            results.append({
+                "Ticker": ticker,
+                "Name": name,
+                "Kurs": round(price_now, 2),
+                "3W Perf (%)": round(perf_3w, 2),
+                "Abstand 52W (%)": round(dist_52w, 2),
+                "Dividende (%)": round((div or 0) * 100, 2),
+                "KGV": round(pe, 2),
+                "Score": round(score, 2)
+            })
 
-                if pe is None or div is None:
-                    continue
+        except Exception as e:
+            st.write(f"⚠️ Fehler bei {ticker}: {e}")
 
-                if perf_3w < min_perf:
-                    continue
-                after_perf += 1
+# --------------------------------------------------
+# Ergebnis
+# --------------------------------------------------
+if len(results) == 0:
+    st.warning("⚠️ Keine Aktien gefunden – Filter bitte lockern.")
+else:
+    df = pd.DataFrame(results).sort_values("Score", ascending=False)
+    st.subheader("🏆 Ergebnisse")
+    st.dataframe(df, use_container_width=True)
 
-                if use_dist and dist_52w > -min_dist:
-                    continue
-                after_dist += 1
-
-                if pe > max_pe:
-                    continue
-                after_pe += 1
-
-                if use_div and div * 100 < min_div:
-                    continue
-                after_div += 1
-
-                score = (
-                    perf_3w * w_perf +
-                    abs(dist_52w) * w_dist +
-                    (div * 100) * w_div +
-                    (max_pe - pe) * w_pe)
-                
-                results.append({
-    "Ticker": ticker,
-    "Name": name,
-    "Kurs": round(price_now, 2),
-    "3W Perf (%)": round(perf_3w, 2),
-    "Abstand 52W (%)": round(dist_52w, 2),
-    "Dividende (%)": round(div * 100, 2),
-    "KGV": round(pe, 2),
-    "Score": round(score, 2),
-    "Score Momentum": round(perf_3w * w_perf, 2),
-    "Score Turnaround": round(abs(dist_52w) * w_dist, 2),
-    "Score Dividende": round((div * 100) * w_div, 2),
-    "Score Bewertung": round((max_pe - pe) * w_pe, 2),})
-    
-            except Exception: 
-                   pass
+    st.download_button(
+        "⬇️ Ergebnis als CSV",
+        df.to_csv(index=False),
+        "aktien_screener.csv"
+    )
