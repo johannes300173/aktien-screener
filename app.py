@@ -4,28 +4,33 @@ import pandas as pd
 from datetime import datetime, timedelta
 from tickers import DAX, DOW_JONES, SP500, NIKKEI
 
+# --------------------------------------------------
+# App Setup
+# --------------------------------------------------
 st.set_page_config(page_title="Aktienscreener", layout="wide")
-st.title("📈 Aktienscreener – Value & Momentum")
+st.title("📈 Aktienscreener – Value, Momentum & Turnaround")
 
-st.sidebar.header("🔍 Filter")
+# --------------------------------------------------
+# Sidebar – Modus
+# --------------------------------------------------
+st.sidebar.header("👤 Modus")
 
-min_perf = st.sidebar.slider("3-Wochen-Performance (%)", 0, 20, 5)
-min_div = st.sidebar.slider("Dividendenrendite (%)", 0.0, 10.0, 5.0)
-max_pe = st.sidebar.slider("Max. KGV", 1, 30, 14)
-min_dist = st.sidebar.slider("Abstand vom 52W-Hoch (%)", 0, 60, 30)
+mode = st.sidebar.radio(
+    "Benutzermodus",
+    ["🟢 Anfänger", "🔵 Pro"],
+    help="Anfänger = einfache Presets | Pro = volle Kontrolle"
+)
+
+# --------------------------------------------------
+# Sidebar – Indizes
+# --------------------------------------------------
+st.sidebar.header("🌍 Indizes")
 
 indices = st.sidebar.multiselect(
-    "Indizes",
+    "Welche Märkte?",
     ["DAX", "Dow Jones", "S&P 500", "Nikkei"],
     default=["DAX", "Dow Jones"]
 )
-
-st.sidebar.header("⚖️ Score-Gewichtung")
-
-w_perf = st.sidebar.slider("Momentum", 0.0, 1.0, 0.4)
-w_dist = st.sidebar.slider("Turnaround", 0.0, 1.0, 0.3)
-w_div = st.sidebar.slider("Dividende", 0.0, 1.0, 0.2)
-w_pe = st.sidebar.slider("Bewertung (KGV)", 0.0, 1.0, 0.1)
 
 ticker_map = {}
 if "DAX" in indices:
@@ -37,16 +42,77 @@ if "S&P 500" in indices:
 if "Nikkei" in indices:
     ticker_map.update(NIKKEI)
 
+# --------------------------------------------------
+# Anfänger-Modus
+# --------------------------------------------------
+if mode == "🟢 Anfänger":
+
+    st.sidebar.header("🧭 Strategie")
+
+    strategy = st.sidebar.selectbox(
+        "Anlagestrategie",
+        ["⚖️ Ausgewogen", "🚀 Wachstum", "🛡️ Dividende", "🎯 Turnaround"]
+    )
+
+    if strategy == "⚖️ Ausgewogen":
+        min_perf, min_div, max_pe, min_dist = 0, 1.5, 18, 15
+        w_perf, w_dist, w_div, w_pe = 0.4, 0.2, 0.2, 0.2
+
+    elif strategy == "🚀 Wachstum":
+        min_perf, min_div, max_pe, min_dist = 5, 0.0, 30, 5
+        w_perf, w_dist, w_div, w_pe = 0.7, 0.1, 0.0, 0.2
+
+    elif strategy == "🛡️ Dividende":
+        min_perf, min_div, max_pe, min_dist = -2, 3.0, 15, 20
+        w_perf, w_dist, w_div, w_pe = 0.2, 0.1, 0.5, 0.2
+
+    elif strategy == "🎯 Turnaround":
+        min_perf, min_div, max_pe, min_dist = -5, 0.5, 20, 35
+        w_perf, w_dist, w_div, w_pe = 0.2, 0.6, 0.1, 0.1
+
+    use_div = True
+    use_dist = True
+
+# --------------------------------------------------
+# Pro-Modus
+# --------------------------------------------------
+else:
+    st.sidebar.header("🔍 Filter")
+
+    min_perf = st.sidebar.slider("3W Performance (%)", -10, 20, 2)
+    min_div = st.sidebar.slider("Dividende (%)", 0.0, 10.0, 1.5)
+    max_pe = st.sidebar.slider("Max. KGV", 5, 40, 18)
+    min_dist = st.sidebar.slider("Abstand vom 52W-Hoch (%)", 0, 60, 15)
+
+    use_div = st.sidebar.checkbox("Dividenden-Filter aktiv", True)
+    use_dist = st.sidebar.checkbox("52W-Abstand aktiv", True)
+
+    st.sidebar.header("⚖️ Score-Gewichtung")
+    w_perf = st.sidebar.slider("Momentum", 0.0, 1.0, 0.4)
+    w_dist = st.sidebar.slider("Turnaround", 0.0, 1.0, 0.2)
+    w_div = st.sidebar.slider("Dividende", 0.0, 1.0, 0.2)
+    w_pe = st.sidebar.slider("Bewertung (KGV)", 0.0, 1.0, 0.2)
+
+# --------------------------------------------------
+# Zeitraum
+# --------------------------------------------------
 end = datetime.today()
 start = end - timedelta(days=120)
 
+# --------------------------------------------------
+# Screener
+# --------------------------------------------------
 if st.button("🚀 Screener starten"):
 
     results = []
 
-    with st.spinner("Daten werden geladen..."):
+    total = after_perf = after_dist = after_pe = after_div = 0
+
+    with st.spinner("📡 Lade Marktdaten..."):
         for ticker, name in ticker_map.items():
             try:
+                total += 1
+
                 stock = yf.Ticker(ticker)
                 hist = stock.history(start=start, end=end)
 
@@ -64,14 +130,24 @@ if st.button("🚀 Screener starten"):
                 pe = info.get("trailingPE")
                 div = info.get("dividendYield")
 
-                if (
-                    pe is None or div is None or
-                    perf_3w < min_perf or
-                    dist_52w > -min_dist or
-                    pe > max_pe or
-                    div * 100 < min_div
-                ):
+                if pe is None or div is None:
                     continue
+
+                if perf_3w < min_perf:
+                    continue
+                after_perf += 1
+
+                if use_dist and dist_52w > -min_dist:
+                    continue
+                after_dist += 1
+
+                if pe > max_pe:
+                    continue
+                after_pe += 1
+
+                if use_div and div * 100 < min_div:
+                    continue
+                after_div += 1
 
                 score = (
                     perf_3w * w_perf +
@@ -84,26 +160,10 @@ if st.button("🚀 Screener starten"):
                     "Ticker": ticker,
                     "Name": name,
                     "Kurs": round(price_now, 2),
-                    "3W Performance (%)": round(perf_3w, 2),
-                    "Abstand 52W Hoch (%)": round(dist_52w, 2),
+                    "3W Perf (%)": round(perf_3w, 2),
+                    "Abstand 52W (%)": round(dist_52w, 2),
                     "Dividende (%)": round(div * 100, 2),
                     "KGV": round(pe, 2),
-                    "Score": round(score, 2)
-                })
-
-            except Exception as e:
-                st.write(f"⚠️ Fehler bei {ticker}: {e}")
-
-    if len(results) == 0:
-        st.warning("⚠️ Keine Aktien gefunden. Bitte Filter lockern.")
-    else:
-        df = pd.DataFrame(results).sort_values("Score", ascending=False)
-
-        st.subheader("🏆 Ranking")
-        st.dataframe(df, use_container_width=True)
-
-        st.download_button(
-            "⬇️ Ergebnis als CSV",
-            df.to_csv(index=False),
-            "aktien_screener.csv"
-        )
+                    "Score": round(score, 2),
+                    "Score Momentum": round(perf_3w * w_perf, 2),
+                    "Score Turnaround": round(abs(dist_
