@@ -155,7 +155,7 @@ if st.button("🚀 Screener starten"):
                     (div * 100) * w_div +
                     (max_pe - pe) * w_pe)
                 
-results.append({
+    results.append({
     "Ticker": ticker,
     "Name": name,
     "Kurs": round(price_now, 2),
