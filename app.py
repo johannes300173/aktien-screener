@@ -157,13 +157,17 @@ if st.button("🚀 Screener starten"):
                 )
 
                 results.append({
-                    "Ticker": ticker,
-                    "Name": name,
-                    "Kurs": round(price_now, 2),
-                    "3W Perf (%)": round(perf_3w, 2),
-                    "Abstand 52W (%)": round(dist_52w, 2),
-                    "Dividende (%)": round(div * 100, 2),
-                    "KGV": round(pe, 2),
-                    "Score": round(score, 2),
-                    "Score Momentum": round(perf_3w * w_perf, 2),
-                    "Score Turnaround": round(abs(dist_
+    "Ticker": ticker,
+    "Name": name,
+    "Kurs": round(price_now, 2),
+    "3W Perf (%)": round(perf_3w, 2),
+    "Abstand 52W (%)": round(dist_52w, 2),
+    "Dividende (%)": round(div * 100, 2),
+    "KGV": round(pe, 2),
+    "Score": round(score, 2),
+
+    "Score Momentum": round(perf_3w * w_perf, 2),
+    "Score Turnaround": round(abs(dist_52w) * w_dist, 2),
+    "Score Dividende": round((div * 100) * w_div, 2),
+    "Score Bewertung": round((max_pe - pe) * w_pe, 2),
+})
