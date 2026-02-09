@@ -168,5 +168,5 @@ if st.button("🚀 Screener starten"):
     "Score Turnaround": round(abs(dist_52w) * w_dist, 2),
     "Score Dividende": round((div * 100) * w_div, 2),
     "Score Bewertung": round((max_pe - pe) * w_pe, 2),})
-     except Exception:
-        pass
+    
+                    except Exception: pass
