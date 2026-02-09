@@ -28,7 +28,6 @@ w_div = st.sidebar.slider("Dividende", 0.0, 1.0, 0.2)
 w_pe = st.sidebar.slider("Bewertung (KGV)", 0.0, 1.0, 0.1)
 
 ticker_map = {}
-
 if "DAX" in indices:
     ticker_map.update(DAX)
 if "Dow Jones" in indices:
@@ -41,9 +40,9 @@ if "Nikkei" in indices:
 end = datetime.today()
 start = end - timedelta(days=120)
 
-results = []
-
 if st.button("🚀 Screener starten"):
+
+    results = []
 
     with st.spinner("Daten werden geladen..."):
         for ticker, name in ticker_map.items():
@@ -92,19 +91,19 @@ if st.button("🚀 Screener starten"):
                     "Score": round(score, 2)
                 })
 
-            except Exception:
-                pass
+            except Exception as e:
+                st.write(f"⚠️ Fehler bei {ticker}: {e}")
 
     if len(results) == 0:
-    st.warning("⚠️ Keine Aktien gefunden. Bitte Filter lockern.")
-else:
-    df = pd.DataFrame(results).sort_values("Score", ascending=False)
+        st.warning("⚠️ Keine Aktien gefunden. Bitte Filter lockern.")
+    else:
+        df = pd.DataFrame(results).sort_values("Score", ascending=False)
 
-    st.subheader("🏆 Ranking")
-    st.dataframe(df, use_container_width=True)
+        st.subheader("🏆 Ranking")
+        st.dataframe(df, use_container_width=True)
 
-    st.download_button(
-        "⬇️ Ergebnis als CSV",
-        df.to_csv(index=False),
-        "aktien_screener.csv"
-    )
+        st.download_button(
+            "⬇️ Ergebnis als CSV",
+            df.to_csv(index=False),
+            "aktien_screener.csv"
+        )
