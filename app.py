@@ -95,6 +95,9 @@ if st.button("🚀 Screener starten"):
             except Exception:
                 pass
 
+    if len(results) == 0:
+    st.warning("⚠️ Keine Aktien gefunden. Bitte Filter lockern.")
+else:
     df = pd.DataFrame(results).sort_values("Score", ascending=False)
 
     st.subheader("🏆 Ranking")
