@@ -1,92 +1,46 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import time
 from datetime import datetime, timedelta
 from tickers import DAX, DOW_JONES, SP500, NIKKEI
 
 # --------------------------------------------------
 # App Setup
 # --------------------------------------------------
-st.set_page_config(page_title="Aktienscreener", layout="wide")
-st.title("📈 Aktienscreener – Value, Momentum & Turnaround")
+st.set_page_config(page_title="Aktienscreener (Hybrid)", layout="wide")
+st.title("📊 Aktienscreener – Hybrid-Version")
+st.caption("Phase 1: Performance | Phase 2: Fundamentaldaten (Top 20)")
 
 # --------------------------------------------------
-# SIDEBAR – FORM (alles wird erst beim Start gesetzt!)
+# Sidebar – Filter
 # --------------------------------------------------
-with st.sidebar.form("screener_form"):
+with st.sidebar:
+    with st.form("filter_form"):
 
-    st.header("👤 Modus")
-    mode = st.radio(
-        "Benutzermodus",
-        ["🟢 Anfänger", "🔵 Pro"]
-    )
+        st.subheader("Bewertung (Phase 2)")
+        kgv_min = st.number_input("KGV von", 0.0, 100.0, 0.0, 0.5)
+        kgv_max = st.number_input("KGV bis", 0.0, 100.0, 30.0, 0.5)
 
-    st.divider()
+        div_min = st.number_input("Dividende von (%)", 0.0, 20.0, 0.0, 0.1)
+        div_max = st.number_input("Dividende bis (%)", 0.0, 20.0, 10.0, 0.1)
 
-    st.header("🌍 Indizes")
-    indices = st.multiselect(
-        "Welche Märkte?",
-        ["DAX", "Dow Jones", "S&P 500", "Nikkei"],
-        default=["DAX", "Dow Jones"]
-    )
+        st.subheader("Performance (Phase 1)")
+        lookback_days = st.number_input("Zeitraum (Börsentage)", 5, 250, 20)
+        min_performance = st.number_input("Mindest-Performance (%)", value=0.0)
 
-    st.divider()
-
-    if mode == "🟢 Anfänger":
-        st.header("🧭 Strategie")
-        strategy = st.selectbox(
-            "Anlagestrategie",
-            ["⚖️ Ausgewogen", "🚀 Wachstum", "🛡️ Dividende", "🎯 Turnaround"]
+        st.subheader("Indizes")
+        indices = st.multiselect(
+            "Auswahl",
+            ["DAX", "Dow Jones", "S&P 500", "Nikkei"],
+            default=["DAX", "Dow Jones"]
         )
-    else:
-        st.header("🔍 Filter")
-        min_perf = st.slider("3W Performance (%)", -10, 20, 2)
-        min_div = st.slider("Dividende (%)", 0.0, 10.0, 1.5)
-        max_pe = st.slider("Max. KGV", 5, 40, 18)
-        min_dist = st.slider("Abstand vom 52W-Hoch (%)", 0, 60, 15)
 
-        use_div = st.checkbox("Dividenden-Filter aktiv", True)
-        use_dist = st.checkbox("52W-Abstand aktiv", True)
+        submitted = st.form_submit_button("🚀 Screener starten")
 
-        st.subheader("⚖️ Score-Gewichtung")
-        w_perf = st.slider("Momentum", 0.0, 1.0, 0.4)
-        w_dist = st.slider("Turnaround", 0.0, 1.0, 0.2)
-        w_div = st.slider("Dividende", 0.0, 1.0, 0.2)
-        w_pe = st.slider("Bewertung (KGV)", 0.0, 1.0, 0.2)
-
-    submitted = st.form_submit_button("🚀 Screener starten")
-
-# --------------------------------------------------
-# Warten bis Start gedrückt wurde
-# --------------------------------------------------
 if not submitted:
-    st.info("⬅️ Bitte Parameter einstellen und den Screener starten.")
+    st.info("⬅️ Filter setzen und Screener starten")
     st.stop()
-
-# --------------------------------------------------
-# Presets für Anfänger-Modus (NACH dem Button!)
-# --------------------------------------------------
-if mode == "🟢 Anfänger":
-
-    if strategy == "⚖️ Ausgewogen":
-        min_perf, min_div, max_pe, min_dist = 0, 1.5, 18, 15
-        w_perf, w_dist, w_div, w_pe = 0.4, 0.2, 0.2, 0.2
-        use_div, use_dist = True, True
-
-    elif strategy == "🚀 Wachstum":
-        min_perf, min_div, max_pe, min_dist = 5, 0.0, 30, 5
-        w_perf, w_dist, w_div, w_pe = 0.7, 0.1, 0.0, 0.2
-        use_div, use_dist = False, False
-
-    elif strategy == "🛡️ Dividende":
-        min_perf, min_div, max_pe, min_dist = -2, 3.0, 15, 20
-        w_perf, w_dist, w_div, w_pe = 0.2, 0.1, 0.5, 0.2
-        use_div, use_dist = True, True
-
-    elif strategy == "🎯 Turnaround":
-        min_perf, min_div, max_pe, min_dist = -5, 0.5, 20, 35
-        w_perf, w_dist, w_div, w_pe = 0.2, 0.6, 0.1, 0.1
-        use_div, use_dist = False, True
 
 # --------------------------------------------------
 # Ticker Map
@@ -105,77 +59,105 @@ if "Nikkei" in indices:
 # Zeitraum
 # --------------------------------------------------
 end = datetime.today()
-start = end - timedelta(days=120)
+start = end - timedelta(days=400)
 
 # --------------------------------------------------
-# Screener Logik
+# PHASE 1 – Performance Scan
 # --------------------------------------------------
-results = []
+candidates = []
 
-with st.spinner("📡 Lade Marktdaten..."):
+with st.spinner("🔍 Phase 1: Performance-Scan"):
     for ticker, name in ticker_map.items():
         try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(start=start, end=end)
+            hist = yf.Ticker(ticker).history(start=start, end=end)
 
-            if len(hist) < 30:
+            if len(hist) < lookback_days + 1:
                 continue
 
             price_now = hist["Close"].iloc[-1]
-            price_3w = hist["Close"].iloc[-15]
+            price_then = hist["Close"].iloc[-lookback_days]
 
-            perf_3w = ((price_now / price_3w) - 1) * 100
+            perf = ((price_now / price_then) - 1) * 100
+
+            if perf < min_performance:
+                continue
+
             high_52w = hist["High"].max()
-            dist_52w = ((price_now / high_52w) - 1) * 100
+            high_date = hist["High"].idxmax().date()
 
-            info = stock.info
-            pe = info.get("trailingPE")
-            div = info.get("dividendYield")
-
-            if pe is None:
-                continue
-            if use_div and (div is None or div * 100 < min_div):
-                continue
-            if perf_3w < min_perf:
-                continue
-            if use_dist and dist_52w > -min_dist:
-                continue
-            if pe > max_pe:
-                continue
-
-            score = (
-                perf_3w * w_perf +
-                abs(dist_52w) * w_dist +
-                (div * 100 if div else 0) * w_div +
-                (max_pe - pe) * w_pe
-            )
-
-            results.append({
+            candidates.append({
                 "Ticker": ticker,
-                "Name": name,
+                "Aktie": name,
                 "Kurs": round(price_now, 2),
-                "3W Perf (%)": round(perf_3w, 2),
-                "Abstand 52W (%)": round(dist_52w, 2),
-                "Dividende (%)": round((div or 0) * 100, 2),
-                "KGV": round(pe, 2),
-                "Score": round(score, 2)
+                "Performance (%)": round(perf, 2),
+                "52W Hoch": round(high_52w, 2),
+                "Datum 52W Hoch": high_date
             })
 
-        except Exception as e:
-            st.write(f"⚠️ Fehler bei {ticker}: {e}")
+        except Exception:
+            continue
+
+# Top 20 nach Performance
+df_phase1 = pd.DataFrame(candidates)
+df_phase1 = df_phase1.sort_values("Performance (%)", ascending=False).head(20)
+
+# --------------------------------------------------
+# PHASE 2 – Fundamentaldaten NUR für Top 20
+# --------------------------------------------------
+results = []
+
+with st.spinner("📊 Phase 2: Fundamentaldaten (Top 20)"):
+    for _, row in df_phase1.iterrows():
+        try:
+            stock = yf.Ticker(row["Ticker"])
+            fast = stock.fast_info
+
+            pe = fast.get("pe_ratio")
+            div = fast.get("dividend_yield")
+            div_percent = (div or 0) * 100
+
+            if pe is None or pe < kgv_min or pe > kgv_max:
+                continue
+            if div_percent < div_min or div_percent > div_max:
+                continue
+
+            row["KGV"] = round(pe, 2)
+            row["Dividende (%)"] = round(div_percent, 2)
+
+            results.append(row)
+
+            time.sleep(0.4)  # sehr wenige Requests → stabil
+
+        except Exception:
+            continue
 
 # --------------------------------------------------
 # Ergebnis
 # --------------------------------------------------
-if len(results) == 0:
-    st.warning("⚠️ Keine Aktien gefunden – Filter bitte lockern.")
+if not results:
+    st.warning("⚠️ Keine Aktien nach Fundamentaldaten übrig.")
 else:
-    df = pd.DataFrame(results).sort_values("Score", ascending=False)
-    st.subheader("🏆 Ergebnisse")
-    st.dataframe(df, use_container_width=True)
+    df_final = pd.DataFrame(results)
+
+    st.subheader("🏆 Top 20 Aktien (Hybrid-Screener)")
+    st.dataframe(
+        df_final[
+            [
+                "Aktie",
+                "Ticker",
+                "Kurs",
+                "Dividende (%)",
+                "KGV",
+                "Performance (%)",
+                "52W Hoch",
+                "Datum 52W Hoch"
+            ]
+        ],
+        use_container_width=True
+    )
 
     st.download_button(
         "⬇️ Ergebnis als CSV",
-        df.to_csv(index=False),
-        "aktien_screener.csv"
+        df_final.to_csv(index=False),
+        "hybrid_aktienscreener.csv"
     )
